@@ -13,7 +13,14 @@ add_library(
     network.cpp
 )
 
+add_library(
+    data
+    data.hpp
+    data.cpp
+)
+
 add_executable(cmake main.cpp)
 
+target_link_libraries(cmake PRIVATE data)
 target_link_libraries(cmake PRIVATE network)
 target_link_libraries(cmake PRIVATE world)

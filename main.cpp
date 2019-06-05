@@ -1,9 +1,14 @@
 #include <iostream>
+#include <ctime>
 
-#include "environment.hpp"
+#include "world.hpp"
 
 int main(int argc, char* argv[]) {
-	Environment* environment = new Environment();
-	environment->start();
-	delete environment;
+	// set random seed
+	srand(static_cast <unsigned> (time(0)));
+
+	// create and run a world
+	World* world = new World();
+	world->start();
+	delete world;
 }
