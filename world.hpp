@@ -13,10 +13,9 @@ public:
 	static const unsigned int FITTEST_SURVIVORS_SIZE;
 	static const unsigned int FITTEST_SURVIVORS_TRAINING;
 
-	World();
-	~World();
+	World(Data * data);
 	void evolve(double);
-	std::vector <float> predict();
+	void predict(unsigned int);
 
 private:
 	std::vector <std::shared_ptr <Network>> population;

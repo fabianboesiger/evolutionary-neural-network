@@ -10,19 +10,15 @@ const unsigned int World::FITTEST_SURVIVORS_TRAINING = 4;
 
 
 
-World::World() {
+World::World(Data * data):
+	data(data) {
 	std::cout << "creating new world" << std::endl;
 
-	data = new Data();
 	for (unsigned int i = 0; i < POPULATION_SIZE; i++) {
 		population.push_back(std::shared_ptr <Network> (new Network(data)));
 	}
 
 	winner = nullptr;
-}
-
-World::~World() {
-	delete data;
 }
 
 void World::evolve(double wantedError) {
@@ -85,8 +81,11 @@ void World::evolve(double wantedError) {
 
 }
 
-std::vector <float> World::predict() {
+void World::predict(unsigned int amount) {
 	std::cout << "start predicting" << std::endl;
 
-	return winner->run(data->getDataSize());
+	for (unsigned int i = 0; i < amount; i++) {
+		std::vector <float> result = winner->run(data->getDataSize());
+		data->addData(result);
+	}
 }

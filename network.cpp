@@ -1,12 +1,13 @@
 #include <iostream>
 #include <thread>
+#include <math.h>
 
 #include "network.hpp"
 
 
 
 // training constants
-const double Network::DELTA_MULTIPLIER = 0.5;
+const float Network::DELTA_MULTIPLIER = 0.5;
 // the following constants have to be greater than one
 const unsigned int Network::EXPECTED_LAYERS = 3;
 const unsigned int Network::EXPECTED_LAYER_SIZE = 4;
@@ -14,7 +15,7 @@ const unsigned int Network::EXPECTED_HOLD = 3;
 // mutation settings
 const double Network::HOLD_MUTATION_CHANCE = 0.2;
 const double Network::NEURON_MUTATION_CHANCE = 0.2;
-const double Network::LAYER_MUTATION_CHANCE = 0.2;
+const double Network::LAYER_MUTATION_CHANCE = 0.2+0.4;
 
 
 
@@ -125,13 +126,14 @@ Network::Network(std::shared_ptr <Network> parent):
 						newNeuronsCount--;
 						neuronList.push_back(newNeuronsCount);
 						layer.push_back(newNeuron);
+						
 						// create random axons for new neuron
 						std::vector <float> vector;
+						
 						for (unsigned int k = 0; k < neurons.back().size(); k++) {
 							vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2)) - 1);
 						}
 						matrix.push_back(vector);
-
 						// preserve old neuron
 						Neuron neuron;
 						neuron.hold = parent->neurons.at(i).at(j).hold;
@@ -185,15 +187,9 @@ Network::Network(std::shared_ptr <Network> parent):
 			}
 		}
 
-		// information about last layer
-		passedNewNeuronsCount = newNeuronsCount;
-		passedNeuronList.swap(neuronList);
-		
-		newNeuronsCount = 0;
-		neuronList.clear();
-
-		if (i != 0 && i != parent->neurons.size() - 1 && std::rand() < RAND_MAX * LAYER_MUTATION_CHANCE) {
+		if (false && i != 0 && i != parent->neurons.size() - 1 && std::rand() < RAND_MAX * LAYER_MUTATION_CHANCE) {
 			// mutate layer
+
 			if (std::rand() < RAND_MAX * 0.5) {
 				// preserve old layer
 				neurons.push_back(layer);
@@ -201,40 +197,49 @@ Network::Network(std::shared_ptr <Network> parent):
 					axons.push_back(matrix);
 				}
 
-				// add new random layer
-				std::vector <Neuron> layer;
-				size_t layerSize = 0;
-				while (std::rand() < RAND_MAX * (1 - 1.0 / EXPECTED_LAYER_SIZE)) {
-					layerSize++;
-				}
-
-				for (unsigned int j = 0; j < layerSize; j++) {
-					unsigned int hold = 1;
-					while (std::rand() < RAND_MAX * (1 - 1.0 / EXPECTED_HOLD)) {
-						hold++;
-					}
+				// add new layer
+				std::vector <Neuron> newLayer;
+				for (unsigned int j = 0; j < layer.size(); j++) {
 					Neuron neuron;
 					neuron.hold = 1;
-					layer.push_back(neuron);
+					newLayer.push_back(neuron);
 				}
-				neurons.push_back(layer);
+				neurons.push_back(newLayer);
 
-				std::vector <std::vector <float>> matrix;
-				for (unsigned int j = 0; j < neurons.back().size(); j++) {
+				std::vector <std::vector <float>> newMatrix;
+				for (unsigned int j = 0; j < layer.size(); j++) {
 					std::vector <float> vector;
-					for (unsigned int k = 0; k < neurons.at(neurons.size() - 2).size(); k++) {
-						vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2)) - 1);
+					for (unsigned int k = 0; k < layer.size(); k++) {
+						if (j == k) {
+							vector.push_back(1);
+						}
+						else {
+							vector.push_back(0);
+						}
 					}
-					matrix.push_back(vector);
+					newMatrix.push_back(vector);
 				}
-				axons.push_back(matrix);
+				axons.push_back(newMatrix);
+
+				// information about last layer
+				passedNewNeuronsCount = newNeuronsCount;
+				passedNeuronList.swap(neuronList);
+				newNeuronsCount = 0;
+				neuronList.clear();
 			}
 		} else {
 			// do not mutate layer
+
 			neurons.push_back(layer);
 			if (i > 0) {
 				axons.push_back(matrix);
 			}
+
+			// information about last layer
+			passedNewNeuronsCount = newNeuronsCount;
+			passedNeuronList.swap(neuronList);
+			newNeuronsCount = 0;
+			neuronList.clear();
 		}
 	}
 
@@ -251,6 +256,7 @@ void Network::train() {
 			for (unsigned int k = 0; k < axons.at(i).at(j).size(); k++) {
 				Network clone = *this;
 				threads.push_back(std::thread(&Network::trainAxon, clone, this, i, j, k));
+				// trainAxon(this, i, j, k);
 			}
 		}
 	}
@@ -266,7 +272,7 @@ void Network::train() {
 }
 
 std::vector <float> Network::run(size_t to) {
-	
+
 	// clear all neurons
 	for (unsigned int i = 0; i < neurons.size(); i++) {
 		for (unsigned int j = 0; j < neurons.at(i).size(); j++) {
@@ -276,7 +282,6 @@ std::vector <float> Network::run(size_t to) {
 	}
 
 	std::vector <float> output;
-	
 
 	for (unsigned int i = 0; i < to; i++) {
 		
@@ -312,20 +317,21 @@ std::vector <float> Network::run(size_t to) {
 
 		// age neurons
 		size_t lastLayer = neurons.size() - 1;
-		output.clear();
-		for (unsigned int k = 0; k < neurons.at(lastLayer).size(); k++) {
-			Neuron& neuron = neurons.at(lastLayer).at(k);
+		for (unsigned int j = 0; j < neurons.at(lastLayer).size(); j++) {
+			Neuron& neuron = neurons.at(lastLayer).at(j);
 			if (neuron.values.size() >= neuron.hold) {
-				output.push_back(neuron.values.front());
+				if (i == to - 1) {
+					output.push_back(sigmoidReverse(neuron.values.front()));
+				}
 				neuron.values.pop();
-			}
-			else {
-				output.push_back(0);
+			} else {
+				if (i == to - 1) {
+					output.push_back(0);
+				}
 			}
 		}
 
 	}
-
 	return output;
 }
 
@@ -407,7 +413,12 @@ void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsig
 }
 
 float Network::sigmoid(float input) {
-	return input / (1 + std::abs(input));
+	// return input / (1 + std::abs(input));
+	return tanh(input);
+}
+
+float Network::sigmoidReverse(float input) {
+	return atanh(input);
 }
 
 unsigned int Network::getId() {

@@ -15,7 +15,7 @@ struct Neuron {
 class Network {
 
 public:
-	static const double DELTA_MULTIPLIER;
+	static const float DELTA_MULTIPLIER;
 	static const unsigned int EXPECTED_LAYERS;
 	static const unsigned int EXPECTED_LAYER_SIZE;
 	static const unsigned int EXPECTED_HOLD;
@@ -44,6 +44,7 @@ private:
 	double error;
 	double errorDelta;
 	static float sigmoid(float);
+	static float sigmoidReverse(float);
 	static unsigned int idCount;
 	const unsigned int id;
 	unsigned int generation;
