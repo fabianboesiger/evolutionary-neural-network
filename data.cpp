@@ -19,15 +19,15 @@ Data::Data() {
 	std::cout << "loading data from " << path << std::endl;
 
 	// loading data
-	std::ifstream filestream(path);
-	if (filestream.fail()) {
+	std::ifstream fileStream(path);
+	if (fileStream.fail()) {
 		std::cout << "error occured while loading data" << std::endl;
 		std::exit(1);
 	}
-	for (std::string line; getline(filestream, line);) {
-		std::istringstream linestream(line);
+	for (std::string line; getline(fileStream, line);) {
+		std::istringstream lineStream(line);
 		std::vector <float> temporary;
-		for (std::string token; std::getline(linestream, token, ',');) {
+		for (std::string token; std::getline(lineStream, token, ',');) {
 			temporary.push_back(std::stof(token));
 		}
 		data.push_back(temporary);

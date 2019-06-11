@@ -3,14 +3,35 @@
 
 #include "network.hpp"
 
-Network::Network(Data* data)
-	:data(data) {
+
+
+// training constants
+const double Network::DELTA_MULTIPLIER = 0.5;
+// the following constants have to be greater than one
+const unsigned int Network::EXPECTED_LAYERS = 3;
+const unsigned int Network::EXPECTED_LAYER_SIZE = 4;
+const unsigned int Network::EXPECTED_HOLD = 3;
+// mutation settings
+const double Network::HOLD_MUTATION_CHANCE = 0.2;
+const double Network::NEURON_MUTATION_CHANCE = 0.2;
+const double Network::LAYER_MUTATION_CHANCE = 0.2;
+
+
+
+unsigned int Network::idCount = 0;
+
+Network::Network(Data * data):
+	data(data),
+	id(idCount++) {
 
 	std::cout << "creating new network" << std::endl;
 
+	generation = 1;
+	trainingCount = 0;
+
 	// creating neurons for each layer
 	unsigned int layers = 2;
-	while (std::rand() < RAND_MAX * 1 / 2) {
+	while (std::rand() < RAND_MAX * (1 - 1.0 / EXPECTED_LAYERS)) {
 		layers++;
 	}
 	for (unsigned int i = 0; i < layers; i++) {
@@ -19,14 +40,14 @@ Network::Network(Data* data)
 		if (i == 0 || i == layers - 1) {
 			layerSize = data->getVectorSize();
 		} else {
-			while (std::rand() < RAND_MAX * 9 / 10) {
+			while (std::rand() < RAND_MAX * (1 - 1.0 / EXPECTED_LAYER_SIZE)) {
 				layerSize++;
 			}
 		}
 
 		for (unsigned int j = 0; j < layerSize; j++) {
 			unsigned int hold = 1;
-			while (std::rand() < RAND_MAX * 1 / 2) {
+			while (std::rand() < RAND_MAX * (1 - 1.0 / EXPECTED_HOLD)) {
 				hold++;
 			}
 			Neuron neuron;
@@ -52,8 +73,176 @@ Network::Network(Data* data)
 	calculateError();
 }
 
+Network::Network(std::shared_ptr <Network> parent):
+	data(parent->data),
+	id(idCount++) {
+
+	std::cout << "creating new network from parent" << std::endl;
+
+	generation = parent->generation + 1;
+	trainingCount = parent->trainingCount;
+
+	int newNeuronsCount = 0;
+	std::vector <int> neuronList;
+	int passedNewNeuronsCount = 0;
+	std::vector <int> passedNeuronList;
+
+	for (unsigned int i = 0; i < parent->neurons.size(); i++) {
+		std::vector <Neuron> layer;
+		std::vector <std::vector <float>> matrix;
+		for (unsigned int j = 0; j < parent->neurons.at(i).size(); j++) {
+			bool neuronPreserved = false;
+			// create neurons
+			if (i == 0 || i == parent->neurons.size() - 1) {
+				// first and last layer, no neuron mutations
+				Neuron neuron;
+				neuron.hold = parent->neurons.at(i).at(j).hold;
+				if (std::rand() < RAND_MAX * HOLD_MUTATION_CHANCE) {
+					if (std::rand() < RAND_MAX * 0.5) {
+						// hold mutates up
+						neuron.hold += 1;
+					} else
+					if (neuron.hold > 1) {
+						// hold mutates down
+						neuron.hold -= 1;
+					}
+				}
+				neuronList.push_back(j);
+				layer.push_back(neuron);
+				neuronPreserved = true;
+			} else {
+				// middle layers, with neuron mutations
+				if (std::rand() < RAND_MAX * NEURON_MUTATION_CHANCE) {
+					// neuron mutation
+					if (std::rand() < RAND_MAX * 0.5) {
+						// new neuron
+						unsigned int hold = 1;
+						while (std::rand() < RAND_MAX * (1 - 1.0 / EXPECTED_HOLD)) {
+							hold++;
+						}
+						Neuron newNeuron;
+						newNeuron.hold = 1;
+						newNeuronsCount--;
+						neuronList.push_back(newNeuronsCount);
+						layer.push_back(newNeuron);
+						// create random axons for new neuron
+						std::vector <float> vector;
+						for (unsigned int k = 0; k < neurons.back().size(); k++) {
+							vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2)) - 1);
+						}
+						matrix.push_back(vector);
+
+						// preserve old neuron
+						Neuron neuron;
+						neuron.hold = parent->neurons.at(i).at(j).hold;
+						if (std::rand() < RAND_MAX * HOLD_MUTATION_CHANCE) {
+							if (std::rand() < RAND_MAX * 0.5) {
+								// hold mutates up
+								neuron.hold += 1;
+							} else
+							if (neuron.hold > 1) {
+								// hold mutates down
+								neuron.hold -= 1;
+							}
+						}
+						neuronList.push_back(j);
+						layer.push_back(neuron);
+						neuronPreserved = true;
+					}
+				} else {
+					Neuron neuron;
+					neuron.hold = parent->neurons.at(i).at(j).hold;
+					if (std::rand() < RAND_MAX * HOLD_MUTATION_CHANCE) {
+						if (std::rand() < RAND_MAX * 0.5) {
+							// hold mutates up
+							neuron.hold += 1;
+						} else
+						if (neuron.hold > 1) {
+							// hold mutates down
+							neuron.hold -= 1;
+						}
+					}
+					neuronList.push_back(j);
+					layer.push_back(neuron);
+					neuronPreserved = true;
+				}
+			}
+			// create axons
+			if (i > 0) {
+				if (neuronPreserved) {
+					if (neuronList.back() >= 0) {
+						std::vector <float> vector;
+						for (unsigned int k = 0; k < neurons.back().size(); k++) {
+							if (passedNeuronList.at(k) >= 0) {
+								vector.push_back(parent->axons.at(i - 1).at(neuronList.back()).at(passedNeuronList.at(k)));
+							} else {
+								vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2)) - 1);
+							}
+						}
+						matrix.push_back(vector);
+					}
+				}
+			}
+		}
+
+		// information about last layer
+		passedNewNeuronsCount = newNeuronsCount;
+		passedNeuronList.swap(neuronList);
+		
+		newNeuronsCount = 0;
+		neuronList.clear();
+
+		if (i != 0 && i != parent->neurons.size() - 1 && std::rand() < RAND_MAX * LAYER_MUTATION_CHANCE) {
+			// mutate layer
+			if (std::rand() < RAND_MAX * 0.5) {
+				// preserve old layer
+				neurons.push_back(layer);
+				if (i > 0) {
+					axons.push_back(matrix);
+				}
+
+				// add new random layer
+				std::vector <Neuron> layer;
+				size_t layerSize = 0;
+				while (std::rand() < RAND_MAX * (1 - 1.0 / EXPECTED_LAYER_SIZE)) {
+					layerSize++;
+				}
+
+				for (unsigned int j = 0; j < layerSize; j++) {
+					unsigned int hold = 1;
+					while (std::rand() < RAND_MAX * (1 - 1.0 / EXPECTED_HOLD)) {
+						hold++;
+					}
+					Neuron neuron;
+					neuron.hold = 1;
+					layer.push_back(neuron);
+				}
+				neurons.push_back(layer);
+
+				std::vector <std::vector <float>> matrix;
+				for (unsigned int j = 0; j < neurons.back().size(); j++) {
+					std::vector <float> vector;
+					for (unsigned int k = 0; k < neurons.at(neurons.size() - 2).size(); k++) {
+						vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2)) - 1);
+					}
+					matrix.push_back(vector);
+				}
+				axons.push_back(matrix);
+			}
+		} else {
+			// do not mutate layer
+			neurons.push_back(layer);
+			if (i > 0) {
+				axons.push_back(matrix);
+			}
+		}
+	}
+
+	calculateError();
+}
+
 void Network::train() {
-	float errorBeforeTrain = error;
+	double errorBeforeTrain = error;
 
 	// train all axons
 	std::vector <std::thread> threads;
@@ -70,10 +259,13 @@ void Network::train() {
 		threads.at(i).join();
 	}
 
+	std::cout << std::endl;
+
 	errorDelta = errorBeforeTrain - calculateError();
+	trainingCount++;
 }
 
-std::vector <float> Network::run(Data* data, size_t to) {
+std::vector <float> Network::run(size_t to) {
 	
 	// clear all neurons
 	for (unsigned int i = 0; i < neurons.size(); i++) {
@@ -90,7 +282,7 @@ std::vector <float> Network::run(Data* data, size_t to) {
 		
 		// initialize input neurons
 		for (unsigned int j = 0; j < neurons.at(0).size(); j++) {
-			neurons.at(0).at(j).values.push(data->getData(i).at(j));
+			neurons.at(0).at(j).values.push(sigmoid(data->getData(i).at(j)));
 		}
 
 		// calculate next neurons
@@ -107,7 +299,7 @@ std::vector <float> Network::run(Data* data, size_t to) {
 				}
 
 				Neuron& destination = neurons.at(j).at(k);
-				destination.values.push(value);
+				destination.values.push(sigmoid(value));
 			}
 
 			for (unsigned int k = 0; k < neurons.at(j - 1).size(); k++) {
@@ -146,21 +338,28 @@ float Network::vectorDifference(std::vector <float> vector1, std::vector <float>
 	return output / static_cast <float> (size);
 }
 
-float Network::calculateError() {
+double Network::calculateError() {
 	error = 0;
 	for (unsigned int l = 1; l < data->getDataSize(); l++) {
-		error += vectorDifference(run(data, l), data->getData(l));
+		error += static_cast <double> (vectorDifference(run(l), data->getData(l)));
 	}
 	error /= (data->getDataSize() - 1);
 	return error;
 }
 
-float Network::getError() {
+double Network::getError() {
 	return error;
 }
 
-float Network::getErrorDelta() {
+double Network::getErrorDelta() {
 	return errorDelta;
+}
+
+double Network::getFitness() {
+	if (errorDelta == 0) {
+		return 0;
+	}
+	return 1 - error;
 }
 
 void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsigned int k) {
@@ -169,17 +368,17 @@ void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsig
 
 	float originalDifferenceSum = 0;
 	for (unsigned int l = 1; l < data->getDataSize(); l++) {
-		originalDifferenceSum += vectorDifference(run(data, l), data->getData(l));
+		originalDifferenceSum += vectorDifference(run(l), data->getData(l));
 	}
 	originalDifferenceSum /= (data->getDataSize() - 1);
 
-	float delta = originalDifferenceSum / 10;
+	float delta = originalDifferenceSum * DELTA_MULTIPLIER;
 
 	// up it
 	float uppedDifferenceSum = 0;
 	axons.at(i).at(j).at(k) = originalValue + delta;
 	for (unsigned int l = 1; l < data->getDataSize(); l++) {
-		uppedDifferenceSum += vectorDifference(run(data, l), data->getData(l));
+		uppedDifferenceSum += vectorDifference(run(l), data->getData(l));
 	}
 	uppedDifferenceSum /= (data->getDataSize() - 1);
 
@@ -187,7 +386,7 @@ void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsig
 	float downedDifferenceSum = 0;
 	axons.at(i).at(j).at(k) = originalValue - delta;
 	for (unsigned int l = 1; l < data->getDataSize(); l++) {
-		downedDifferenceSum += vectorDifference(run(data, l), data->getData(l));
+		downedDifferenceSum += vectorDifference(run(l), data->getData(l));
 	}
 	downedDifferenceSum /= (data->getDataSize() - 1);
 
@@ -205,4 +404,20 @@ void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsig
 	else {
 		original->axons.at(i).at(j).at(k) = originalValue;
 	}
+}
+
+float Network::sigmoid(float input) {
+	return input / (1 + std::abs(input));
+}
+
+unsigned int Network::getId() {
+	return id;
+}
+
+unsigned int Network::getGeneration() {
+	return generation;
+}
+
+unsigned int Network::getTrainingCount() {
+	return trainingCount;
 }
