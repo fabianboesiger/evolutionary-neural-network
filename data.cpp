@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <cmath>
 
 #include "data.hpp"
 
