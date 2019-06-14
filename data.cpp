@@ -7,28 +7,25 @@
 
 
 
-const std::string Data::INPUT_PATH = "input.csv";
-const std::string Data::OUTPUT_PATH = "output.csv";
+const std::string Data::INPUT_FILE = "input.csv";
+const std::string Data::OUTPUT_FILE = "output.csv";
+const float Data::CONTAMINATION_SCALE = 0;
 
 
 
-Data::Data() {
+Data::Data(std::string & path) {
 
-	// constructing path
-	path = __FILE__;
-	if (path.find_last_of('\\') != std::string::npos) {
-		path = path.substr(0, 1 + path.find_last_of('\\'));
-	} else {
-		path = path.substr(0, 1 + path.find_last_of('/'));
-	}
-
-	inputPath = path + INPUT_PATH;
-	outputPath = path + OUTPUT_PATH;
+	inputPath = path + INPUT_FILE;
+	outputPath = path + OUTPUT_FILE;
 
 	std::cout << "loading data from " << inputPath << std::endl;
-	std::cout << "saving data to " << outputPath << std::endl;
+
+	average = 0;
+	variance = 0;
+	count = 0;
 
 	// loading data
+	inputDataSize = 0;
 	std::ifstream fileStream(inputPath);
 	if (fileStream.fail()) {
 		std::cout << "error occured while loading data" << std::endl;
@@ -38,12 +35,28 @@ Data::Data() {
 		std::istringstream lineStream(line);
 		std::vector <float> temporary;
 		for (std::string token; std::getline(lineStream, token, ',');) {
-			temporary.push_back(std::stof(token));
+			float value = std::stof(token);
+			temporary.push_back(value);
+
+			average += value;
+			count++;
 		}
 		data.push_back(temporary);
+		inputDataSize++;
 	}
 	fileStream.close();
 
+	average /= count;
+
+	for (std::vector <float> vector : data) {
+		for (float value : vector) {
+			variance += std::pow(average - value, 2);
+		}
+	}
+
+	variance /= (count - 1);
+
+	contamine();
 }
 
 size_t Data::getDataSize() {
@@ -54,24 +67,20 @@ size_t Data::getVectorSize() {
 	return data.at(0).size();
 }
 
-std::vector <float> Data::getData(unsigned int i) {
-	return data.at(i);
+std::vector <float> Data::getData(unsigned int i, bool contamined) {
+	if (contamined) {
+		return contaminedData.at(i);
+	} else {
+		return data.at(i);
+	}
 }
 
 void Data::addData(std::vector <float> & newData) {
-	std::cout << "add data: [";
-	for (unsigned int i = 0; i < newData.size(); i++) {
-		if (i > 0) {
-			std::cout << ", ";
-		}
-		std::cout << newData.at(i);
-	}
-	std::cout << "]" << std::endl;
 	data.push_back(newData);
 }
 
-void Data::save() {
-	std::cout << "saving data" << std::endl;
+void Data::save(double error) {
+	std::cout << "saving data to " << outputPath << std::endl;
 
 	// saving data
 	std::ofstream fileStream(outputPath);
@@ -79,18 +88,32 @@ void Data::save() {
 		std::cout << "error occured while saving data" << std::endl;
 		std::exit(1);
 	}
+
+	fileStream << "sep=,\nerror=" << error << '\n';
+
 	for (std::vector <float> vector : data) {
-		std::cout << "[";
 		for (unsigned int i = 0; i < vector.size(); i++) {
 			if (i > 0) {
-				std::cout << ", ";
 				fileStream << ",";
 			}
-			std::cout << vector.at(i);
 			fileStream << vector.at(i);
 		}
-		std::cout << "]" << std::endl;
 		fileStream << '\n';
 	}
 	fileStream.close();
+
+	while (data.size() > inputDataSize) {
+		data.pop_back();
+	}
+}
+
+void Data::contamine() {
+	contaminedData.clear();
+	for (unsigned int i = 0; i < data.size(); i++) {
+		std::vector <float> vector;
+		for (unsigned int j = 0; j < data.at(i).size(); j++) {
+			vector.push_back(data.at(i).at(j) + (static_cast <float> (rand()) / (static_cast <float> (RAND_MAX)) * 2 - 1) * variance * CONTAMINATION_SCALE);
+		}
+		contaminedData.push_back(vector);
+	}
 }

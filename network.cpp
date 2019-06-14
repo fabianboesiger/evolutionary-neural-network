@@ -1,6 +1,8 @@
 #include <iostream>
 #include <thread>
 #include <math.h>
+#include <string>
+#include <fstream>
 
 #include "network.hpp"
 
@@ -9,13 +11,13 @@
 // training constants
 const float Network::DELTA_MULTIPLIER = 0.5;
 // the following constants have to be greater than one
-const unsigned int Network::EXPECTED_LAYERS = 3;
+const unsigned int Network::EXPECTED_LAYERS = 4;
 const unsigned int Network::EXPECTED_LAYER_SIZE = 4;
 const unsigned int Network::EXPECTED_HOLD = 3;
 // mutation settings
-const double Network::HOLD_MUTATION_CHANCE = 0.2;
-const double Network::NEURON_MUTATION_CHANCE = 0.2;
-const double Network::LAYER_MUTATION_CHANCE = 0.2+0.4;
+const double Network::HOLD_MUTATION_CHANCE = 0.3;
+const double Network::NEURON_MUTATION_CHANCE = 0.3;
+const double Network::LAYER_MUTATION_CHANCE = 0.3;
 
 
 
@@ -64,13 +66,14 @@ Network::Network(Data * data):
 		for (unsigned int j = 0; j < neurons.at(i + 1).size(); j++) {
 			std::vector <float> vector;
 			for (unsigned int k = 0; k < neurons.at(i).size(); k++) {
-				vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2)) - 1);
+				vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX)) * 2 - 1);
 			}
 			matrix.push_back(vector);
 		}
 		axons.push_back(matrix);
 	}
 
+	countAxons();
 	calculateError();
 }
 
@@ -131,7 +134,7 @@ Network::Network(std::shared_ptr <Network> parent):
 						std::vector <float> vector;
 						
 						for (unsigned int k = 0; k < neurons.back().size(); k++) {
-							vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2)) - 1);
+							vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX)) * 2 - 1);
 						}
 						matrix.push_back(vector);
 						// preserve old neuron
@@ -178,7 +181,7 @@ Network::Network(std::shared_ptr <Network> parent):
 							if (passedNeuronList.at(k) >= 0) {
 								vector.push_back(parent->axons.at(i - 1).at(neuronList.back()).at(passedNeuronList.at(k)));
 							} else {
-								vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 2)) - 1);
+								vector.push_back(static_cast <float> (rand()) / (static_cast <float> (RAND_MAX)) * 2 - 1);
 							}
 						}
 						matrix.push_back(vector);
@@ -229,7 +232,6 @@ Network::Network(std::shared_ptr <Network> parent):
 			}
 		} else {
 			// do not mutate layer
-
 			neurons.push_back(layer);
 			if (i > 0) {
 				axons.push_back(matrix);
@@ -243,6 +245,71 @@ Network::Network(std::shared_ptr <Network> parent):
 		}
 	}
 
+	countAxons();
+	calculateError();
+}
+
+Network::Network(Data * data, std::ifstream & fileStream):
+	data(data),
+	id(idCount++) {
+
+	std::cout << "loading network" << std::endl;
+
+	// loading generation
+	std::string generationString;
+	getline(fileStream, generationString);
+	generation = stoi(generationString);
+
+	// loading training count
+	std::string trainingCountString;
+	getline(fileStream, trainingCountString);
+	trainingCount = stoi(trainingCountString);
+
+	// loading neurons
+	std::string neuronsIString;
+	getline(fileStream, neuronsIString);
+	unsigned int neuronsI = stoi(neuronsIString);
+	for (unsigned int i = 0; i < neuronsI; i++) {
+		std::string neuronsJString;
+		getline(fileStream, neuronsJString);
+		unsigned int neuronsJ = stoi(neuronsJString);
+		std::vector <Neuron> layer;
+		for (unsigned int j = 0; j < neuronsJ; j++) {
+			std::string holdString;
+			getline(fileStream, holdString);
+			unsigned int hold = stoi(holdString);
+			Neuron neuron;
+			neuron.hold = hold;
+			layer.push_back(neuron);
+		}
+		neurons.push_back(layer);
+	}
+	// loading axons
+	std::string axonsIString;
+	getline(fileStream, axonsIString);
+	unsigned int axonsI = stoi(axonsIString);
+	for (unsigned int i = 0; i < axonsI; i++) {
+		std::string axonsJString;
+		getline(fileStream, axonsJString);
+		unsigned int axonsJ = stoi(axonsJString);
+		std::vector <std::vector <float>> matrix;
+		for (unsigned int j = 0; j < axonsJ; j++) {
+			std::string axonsKString;
+			getline(fileStream, axonsKString);
+			unsigned int axonsK = stoi(axonsKString);
+			std::vector <float> vector;
+			for (unsigned int k = 0; k < axonsK; k++) {
+				std::string valueString;
+				getline(fileStream, valueString);
+				float value = stof(valueString);
+				vector.push_back(value);
+			}
+			matrix.push_back(vector);
+		}
+		axons.push_back(matrix);
+	}
+
+	countAxons();
 	calculateError();
 }
 
@@ -250,20 +317,27 @@ void Network::train() {
 	double errorBeforeTrain = error;
 
 	// train all axons
-	std::vector <std::thread> threads;
+	std::vector <unsigned int> shuffled;
 	for (unsigned int i = 0; i < axons.size(); i++) {
-		for (unsigned int j = 0; j < axons.at(i).size(); j++) {
-			for (unsigned int k = 0; k < axons.at(i).at(j).size(); k++) {
-				Network clone = *this;
-				threads.push_back(std::thread(&Network::trainAxon, clone, this, i, j, k));
+		shuffled.push_back(i);
+	}
+	std::random_shuffle(shuffled.begin(), shuffled.end());
+	for (unsigned int i = 0; i < axons.size(); i++) {
+		unsigned int shuffledI = shuffled.at(i);
+		std::vector <std::thread> threads;
+		Network clone = *this;
+		for (unsigned int j = 0; j < axons.at(shuffledI).size(); j++) {
+			for (unsigned int k = 0; k < axons.at(shuffledI).at(j).size(); k++) {
+				threads.push_back(std::thread(&Network::trainAxon, clone, this, shuffledI, j, k));
 				// trainAxon(this, i, j, k);
 			}
 		}
+		for (unsigned int i = 0; i < threads.size(); i++) {
+			threads.at(i).join();
+		}
 	}
 
-	for (unsigned int i = 0; i < threads.size(); i++) {
-		threads.at(i).join();
-	}
+	
 
 	std::cout << std::endl;
 
@@ -271,7 +345,7 @@ void Network::train() {
 	trainingCount++;
 }
 
-std::vector <float> Network::run(size_t to) {
+std::vector <float> Network::run(size_t to, bool contamined) {
 
 	// clear all neurons
 	for (unsigned int i = 0; i < neurons.size(); i++) {
@@ -285,9 +359,11 @@ std::vector <float> Network::run(size_t to) {
 
 	for (unsigned int i = 0; i < to; i++) {
 		
+		std::vector <float> input = data->getData(i, contamined);
+
 		// initialize input neurons
 		for (unsigned int j = 0; j < neurons.at(0).size(); j++) {
-			neurons.at(0).at(j).values.push(sigmoid(data->getData(i).at(j)));
+			neurons.at(0).at(j).values.push(sigmoid(input.at(j)));
 		}
 
 		// calculate next neurons
@@ -347,7 +423,7 @@ float Network::vectorDifference(std::vector <float> vector1, std::vector <float>
 double Network::calculateError() {
 	error = 0;
 	for (unsigned int l = 1; l < data->getDataSize(); l++) {
-		error += static_cast <double> (vectorDifference(run(l), data->getData(l)));
+		error += static_cast <double> (vectorDifference(run(l, false), data->getData(l, false)));
 	}
 	error /= (data->getDataSize() - 1);
 	return error;
@@ -365,7 +441,7 @@ double Network::getFitness() {
 	if (errorDelta == 0) {
 		return 0;
 	}
-	return 1 - error;
+	return (1 - error);
 }
 
 void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsigned int k) {
@@ -374,7 +450,7 @@ void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsig
 
 	float originalDifferenceSum = 0;
 	for (unsigned int l = 1; l < data->getDataSize(); l++) {
-		originalDifferenceSum += vectorDifference(run(l), data->getData(l));
+		originalDifferenceSum += vectorDifference(run(l, true), data->getData(l, false));
 	}
 	originalDifferenceSum /= (data->getDataSize() - 1);
 
@@ -384,7 +460,7 @@ void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsig
 	float uppedDifferenceSum = 0;
 	axons.at(i).at(j).at(k) = originalValue + delta;
 	for (unsigned int l = 1; l < data->getDataSize(); l++) {
-		uppedDifferenceSum += vectorDifference(run(l), data->getData(l));
+		uppedDifferenceSum += vectorDifference(run(l, true), data->getData(l, false));
 	}
 	uppedDifferenceSum /= (data->getDataSize() - 1);
 
@@ -392,7 +468,7 @@ void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsig
 	float downedDifferenceSum = 0;
 	axons.at(i).at(j).at(k) = originalValue - delta;
 	for (unsigned int l = 1; l < data->getDataSize(); l++) {
-		downedDifferenceSum += vectorDifference(run(l), data->getData(l));
+		downedDifferenceSum += vectorDifference(run(l, true), data->getData(l, false));
 	}
 	downedDifferenceSum /= (data->getDataSize() - 1);
 
@@ -431,4 +507,43 @@ unsigned int Network::getGeneration() {
 
 unsigned int Network::getTrainingCount() {
 	return trainingCount;
+}
+
+void Network::save(std::ofstream & fileStream) {
+	fileStream << generation << '\n';
+	fileStream << trainingCount << '\n';
+
+	fileStream << neurons.size() << '\n';
+	for (unsigned int i = 0; i < neurons.size(); i++) {
+		fileStream << neurons.at(i).size() << '\n';
+		for (unsigned int j = 0; j < neurons.at(i).size(); j++) {
+			fileStream << neurons.at(i).at(j).hold << '\n';
+		}
+	}
+
+	fileStream << axons.size() << '\n';
+	for (unsigned int i = 0; i < axons.size(); i++) {
+		fileStream << axons.at(i).size() << '\n';
+		for (unsigned int j = 0; j < axons.at(i).size(); j++) {
+			fileStream << axons.at(i).at(j).size() << '\n';
+			for (unsigned int k = 0; k < axons.at(i).at(j).size(); k++) {
+				fileStream << axons.at(i).at(j).at(k) << '\n';
+			}
+		}
+	}
+}
+
+void Network::countAxons() {
+	totalAxons = 0;
+	for (unsigned int i = 0; i < axons.size(); i++) {
+		for (unsigned int j = 0; j < axons.at(i).size(); j++) {
+			for (unsigned int k = 0; k < axons.at(i).at(j).size(); k++) {
+				totalAxons++;
+			}
+		}
+	}
+}
+
+unsigned int Network::getTotalAxons() {
+	return totalAxons;
 }

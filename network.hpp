@@ -23,16 +23,19 @@ public:
 	static const double NEURON_MUTATION_CHANCE;
 	static const double LAYER_MUTATION_CHANCE;
 
-	Network(Data*);
+	Network(Data *);
 	Network(std::shared_ptr <Network>);
+	Network(Data *, std::ifstream &);
 	void train();
-	std::vector <float> run(size_t);
+	std::vector <float> run(size_t, bool);
 	double getError();
 	double getErrorDelta();
 	double getFitness();
 	unsigned int getId();
 	unsigned int getGeneration();
 	unsigned int getTrainingCount();
+	void save(std::ofstream &);
+	unsigned int getTotalAxons();
 
 private:
 	std::vector <std::vector <Neuron>> neurons;
@@ -49,6 +52,8 @@ private:
 	const unsigned int id;
 	unsigned int generation;
 	unsigned int trainingCount;
+	unsigned int totalAxons;
+	void countAxons();
 
 };
 
