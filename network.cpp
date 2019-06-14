@@ -1,8 +1,8 @@
 #include <iostream>
 #include <thread>
-#include <math.h>
 #include <string>
 #include <fstream>
+#include <algorithm>
 
 #include "network.hpp"
 
