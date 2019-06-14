@@ -51,7 +51,8 @@ Data::Data(std::string & path) {
 
 	for (std::vector <float> vector : data) {
 		for (float value : vector) {
-			variance += std::pow(average - value, 2);
+			float difference = (average - value);
+			variance += (difference * difference);
 		}
 	}
 
