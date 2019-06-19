@@ -1,0 +1,40 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/fabian/git/evolutionaryneuralnetwork/data.hpp
+vector
+-
+
+/home/fabian/git/evolutionaryneuralnetwork/main.cpp
+iostream
+-
+fstream
+-
+ctime
+-
+world.hpp
+/home/fabian/git/evolutionaryneuralnetwork/world.hpp
+
+/home/fabian/git/evolutionaryneuralnetwork/network.hpp
+vector
+-
+memory
+-
+queue
+-
+data.hpp
+/home/fabian/git/evolutionaryneuralnetwork/data.hpp
+
+/home/fabian/git/evolutionaryneuralnetwork/world.hpp
+thread
+-
+network.hpp
+/home/fabian/git/evolutionaryneuralnetwork/network.hpp
+data.hpp
+/home/fabian/git/evolutionaryneuralnetwork/data.hpp
+

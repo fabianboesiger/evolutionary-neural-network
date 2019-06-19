@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <algorithm>
+#include <cmath>
 
 #include "network.hpp"
 
@@ -328,8 +329,8 @@ void Network::train() {
 		Network clone = *this;
 		for (unsigned int j = 0; j < axons.at(shuffledI).size(); j++) {
 			for (unsigned int k = 0; k < axons.at(shuffledI).at(j).size(); k++) {
-				threads.push_back(std::thread(&Network::trainAxon, clone, this, shuffledI, j, k));
-				// trainAxon(this, i, j, k);
+				// threads.push_back(std::thread(&Network::trainAxon, clone, this, shuffledI, j, k));
+				trainAxon(this, i, j, k);
 			}
 		}
 		for (unsigned int i = 0; i < threads.size(); i++) {
@@ -490,11 +491,11 @@ void Network::trainAxon(Network* original, unsigned int i, unsigned int j, unsig
 
 float Network::sigmoid(float input) {
 	// return input / (1 + std::abs(input));
-	return tanh(input);
+	return std::tanh(input);
 }
 
 float Network::sigmoidReverse(float input) {
-	return atanh(input);
+	return std::atanh(input);
 }
 
 unsigned int Network::getId() {

@@ -19,8 +19,8 @@ add_library(
     network.cpp
 )
 
-add_executable(cmake main.cpp)
+add_executable(main main.cpp)
 
-target_link_libraries(cmake PRIVATE data)
-target_link_libraries(cmake PRIVATE world)
-target_link_libraries(cmake PRIVATE network)
+target_link_libraries(main PRIVATE data)
+target_link_libraries(main PRIVATE world)
+target_link_libraries(main PRIVATE network)
