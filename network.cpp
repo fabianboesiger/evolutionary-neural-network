@@ -322,6 +322,7 @@ void Network::train() {
 	for (unsigned int i = 0; i < axons.size(); i++) {
 		shuffled.push_back(i);
 	}
+
 	std::random_shuffle(shuffled.begin(), shuffled.end());
 	for (unsigned int i = 0; i < axons.size(); i++) {
 		unsigned int shuffledI = shuffled.at(i);
@@ -330,7 +331,7 @@ void Network::train() {
 		for (unsigned int j = 0; j < axons.at(shuffledI).size(); j++) {
 			for (unsigned int k = 0; k < axons.at(shuffledI).at(j).size(); k++) {
 				// threads.push_back(std::thread(&Network::trainAxon, clone, this, shuffledI, j, k));
-				trainAxon(this, i, j, k);
+				trainAxon(this, shuffledI, j, k);
 			}
 		}
 		for (unsigned int i = 0; i < threads.size(); i++) {
