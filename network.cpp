@@ -339,8 +339,6 @@ void Network::train() {
 		}
 	}
 
-	
-
 	std::cout << std::endl;
 
 	errorDelta = errorBeforeTrain - calculateError();
@@ -374,11 +372,21 @@ std::vector <float> Network::run(size_t to, bool contamined) {
 			for (unsigned int k = 0; k < neurons.at(j).size(); k++) {
 
 				float value = 0;
+				unsigned int count = 0;
+
 				for (unsigned int l = 0; l < neurons.at(j - 1).size(); l++) {
 					Neuron& origin = neurons.at(j - 1).at(l);
 					if (origin.values.size() >= origin.hold) {
-						value += origin.values.front() * axons.at(j - 1).at(k).at(l);
+						float originValue = origin.values.front();
+						if (!std::isnan(originValue)) {
+							value += originValue * axons.at(j - 1).at(k).at(l);
+							count++;
+						} 
 					}
+				}
+
+				if (count > 0) {
+					value /= static_cast <float> (count);
 				}
 
 				Neuron& destination = neurons.at(j).at(k);
@@ -415,11 +423,18 @@ std::vector <float> Network::run(size_t to, bool contamined) {
 
 float Network::vectorDifference(std::vector <float> vector1, std::vector <float> vector2) {
 	float output = 0;
+	unsigned int count = 0;
 	size_t size = std::min(vector1.size(), vector2.size());
 	for (unsigned int i = 0; i < size; i++) {
-		output += std::abs(vector1.at(i) - vector2.at(i));
+		if (!std::isnan(vector1.at(i)) && !std::isnan(vector2.at(i))) {
+			output += (std::abs(vector1.at(i) - vector2.at(i)));
+			count++;
+		}
 	}
-	return output / static_cast <float> (size);
+	if (count > 0) {
+		output /= static_cast <float> (count);
+	}
+	return output;
 }
 
 double Network::calculateError() {

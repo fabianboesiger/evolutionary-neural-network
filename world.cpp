@@ -48,6 +48,7 @@ void World::evolve(double wantedError) {
 			std::shared_ptr <Network> & network = population.at(i);
 			if (network->getError() <= wantedError) {
 				winner = network;
+				save();
 				break;
 			}
 			network->train();
@@ -72,6 +73,7 @@ void World::evolve(double wantedError) {
 				std::shared_ptr <Network> & network = population.at(j);
 				if (network->getError() <= wantedError) {
 					winner = network;
+					save();
 					break;
 				}
 				network->train();

@@ -39,23 +39,33 @@ Data::Data(std::string & path) {
 			float value = std::stof(token);
 			temporary.push_back(value);
 
-			average += value;
-			count++;
+			if (!std::isnan(value)) {
+				average += value;
+				count++;
+			}
 		}
 		data.push_back(temporary);
 		inputDataSize++;
 	}
 	fileStream.close();
 
-	average /= count;
+	if (count > 0) {
+		average /= count;
+	}
 
 	for (std::vector <float> vector : data) {
 		for (float value : vector) {
-			variance += std::pow(average - value, 2);
+			if (!std::isnan(value)) {
+				variance += std::pow(average - value, 2);
+			}
 		}
 	}
+	
+	if (count > 1) {
+		variance /= (count - 1);
+	}
 
-	variance /= (count - 1);
+	std::cout << "average is " << average << " with variance " << variance << std::endl;
 
 	contamine();
 }
@@ -109,6 +119,7 @@ void Data::save(double error) {
 }
 
 void Data::contamine() {
+	std::cout << "contamining data" << std::endl;
 	contaminedData.clear();
 	for (unsigned int i = 0; i < data.size(); i++) {
 		std::vector <float> vector;
